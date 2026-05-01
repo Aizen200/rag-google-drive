@@ -1,17 +1,26 @@
 # Virtual environment
 venv/
 backend/venv/
+.venv/
 
 # Python cache
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
 
-# Environment variables
+# Environment variables & secrets
 .env
+*.json
+!service_account.json.example
+!context.json.example
 
-# Credentials
-credentials.json
-service_account.json
+# Vector Store Storage (Local Cache)
+storage/
+backend/storage/
+*.bin
+*.pkl
 
 # OS files
 .DS_Store
+Thumbs.db

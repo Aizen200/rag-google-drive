@@ -7,3 +7,9 @@ google-auth-oauthlib
 python-dotenv
 pypdf
 openai
+faiss-cpu
+sentence-transformers
+numpy
+python-multipart
+tqdm
+groq

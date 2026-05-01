@@ -14,15 +14,23 @@ class RagService:
     def sync_and_index(self, folder_id: str = None) -> int:
         """
         1. Fetch file list from Drive
-        2. Download each file
-        3. Process/Chunk
-        4. Add to Vector Store
+        2. Filter out already indexed files (Incremental Sync)
+        3. Download, process, and add to Vector Store
         """
         files = self.gdrive.list_files(folder_id)
+        indexed_ids = self.vector_store.get_indexed_doc_ids()
+        
         total_chunks = 0
+        files_indexed = 0
 
         for file_meta in files:
+            # Incremental Sync check
+            if file_meta['id'] in indexed_ids:
+                print(f"Skipping {file_meta['name']} (already indexed).")
+                continue
+
             try:
+                print(f"Indexing {file_meta['name']}...")
                 if file_meta['mimeType'] == 'application/vnd.google-apps.document':
                     request = self.gdrive.service.files().export_media(
                         fileId=file_meta['id'], 
@@ -42,11 +50,13 @@ class RagService:
                 if chunks:
                     self.vector_store.add_chunks(chunks)
                     total_chunks += len(chunks)
+                    files_indexed += 1
                     
             except Exception as e:
                 print(f"Error processing file {file_meta['name']}: {str(e)}")
                 continue
 
+        print(f"Sync complete. Indexed {files_indexed} new files.")
         return total_chunks
 
     def query(self, user_query: str, top_k: int = 5) -> List[Dict[str, Any]]:
@@ -59,6 +69,8 @@ class RagService:
         """
         Uses an LLM to generate an answer based on the provided chunks.
         """
+        sources = list(set([c['file_name'] for c in chunks]))
+
         if not chunks:
             return {
                 "answer": "I'm sorry, I couldn't find any relevant information in your documents.",
@@ -82,7 +94,7 @@ class RagService:
         if not api_key:
             return {
                 "answer": "[SIMULATED] Please set GROQ_API_KEY to see real results.",
-                "sources": list(set([c['file_name'] for c in chunks]))
+                "sources": sources
             }
 
         try:
@@ -102,7 +114,7 @@ class RagService:
             
             return {
                 "answer": response.choices[0].message.content,
-                "sources": list(set([c['file_name'] for c in chunks]))
+                "sources": sources
             }
         except Exception as e:
-            return {"answer": f"Error calling LLM: {str(e)}", "sources": []}
+            return {"answer": f"Error calling LLM: {str(e)}", "sources": sources}
